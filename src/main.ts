@@ -1,5 +1,6 @@
 import './style.css';
-import { GameApp } from './app/GameApp';
+
+import { GameApp, asGameCanvas } from './app/GameApp';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -8,7 +9,7 @@ if (!(canvas instanceof HTMLCanvasElement)) {
 }
 
 const app = new GameApp();
-const detach = app.attach(canvas);
+const detach = app.attach(asGameCanvas(canvas));
 app.start();
 
 window.addEventListener('beforeunload', detach);

@@ -710,11 +710,15 @@ export interface MenuModel {
   readonly bestScore: number;
   readonly bestRank: Rank;
   readonly levelCompleted: boolean;
+  readonly levelCount: number;
+  readonly completedLevelCount: number;
+  readonly canResume: boolean;
   readonly controlsHint: readonly string[];
 }
 
 export interface MenuActions {
   readonly onStart: () => void;
+  readonly onLevels: () => void;
   readonly onSettings: () => void;
   readonly onExit: () => void;
 }
@@ -730,6 +734,9 @@ export class MainMenuController {
     switch (id) {
       case 'menu_start':
         this.actions.onStart();
+        return true;
+      case 'menu_levels':
+        this.actions.onLevels();
         return true;
       case 'menu_settings':
         this.actions.onSettings();
@@ -769,32 +776,41 @@ export class MainMenuController {
     ctx.font = '700 20px "IBM Plex Mono", monospace';
     if (model.levelCompleted) {
       ctx.fillStyle = Palette.green;
-      ctx.fillText(
-        `Рекорд: ${model.bestScore} · ${model.bestRank}`,
-        centerX - ctx.measureText(`Рекорд: ${model.bestScore} · ${model.bestRank}`).width / 2,
-        y,
-      );
+      const record = `Рекорд: ${model.bestScore} · ${model.bestRank}`;
+      ctx.fillText(record, centerX - ctx.measureText(record).width / 2, y);
     } else {
       ctx.fillStyle = Palette.textSecondary;
-      ctx.fillText(
-        'Уровень не пройден',
-        centerX - ctx.measureText('Уровень не пройден').width / 2,
-        y,
-      );
+      const empty = 'Уровень не пройден';
+      ctx.fillText(empty, centerX - ctx.measureText(empty).width / 2, y);
     }
+
+    y += 26;
+    ctx.font = '12px "IBM Plex Mono", monospace';
+    ctx.fillStyle = Palette.textMuted;
+    const progress = `УРОВНЕЙ: ${model.completedLevelCount} / ${model.levelCount}`;
+    ctx.fillText(progress, centerX - ctx.measureText(progress).width / 2, y);
 
     ctx.restore();
 
     const buttonW = 280;
     const buttonH = 44;
     const bx = (width - buttonW) / 2;
-    let by = height * 0.58;
+    let by = height * 0.54;
     this.ui.button(
       'menu_start',
       { x: bx, y: by, width: buttonW, height: buttonH },
-      'НАЧАТЬ РАБОТУ',
+      model.canResume ? 'ПРОДОЛЖИТЬ  [Enter]' : 'НАЧАТЬ РАБОТУ  [Enter]',
       {
         accent: Palette.orange,
+      },
+    );
+    by += buttonH + 12;
+    this.ui.button(
+      'menu_levels',
+      { x: bx, y: by, width: buttonW, height: buttonH },
+      'ВЫБОР УРОВНЯ',
+      {
+        accent: Palette.textSecondary,
       },
     );
     by += buttonH + 12;
@@ -826,24 +842,7 @@ export class MainMenuController {
   }
 
   private drawBackdrop(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-    const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, '#0d1116');
-    gradient.addColorStop(1, '#1c232a');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.strokeStyle = 'rgba(125,139,152,0.07)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let x = 0; x <= width; x += 44) {
-      ctx.moveTo(x + 0.5, 0);
-      ctx.lineTo(x + 0.5, height);
-    }
-    for (let y = 0; y <= height; y += 44) {
-      ctx.moveTo(0, y + 0.5);
-      ctx.lineTo(width, y + 0.5);
-    }
-    ctx.stroke();
+    drawMenuBackdrop(ctx, width, height);
 
     // Декоративная схема фермы.
     ctx.strokeStyle = withAlpha(Palette.steel, 0.16);
@@ -861,6 +860,247 @@ export class MainMenuController {
     ctx.lineTo(width * 0.19, baseY - 150);
     ctx.stroke();
   }
+}
+
+export interface LevelCard {
+  readonly id: string;
+  readonly title: string;
+  readonly index: number;
+  readonly maxShots: number;
+  readonly completed: boolean;
+  readonly bestScore: number;
+  readonly bestRank: string;
+  readonly minimumShots: number | null;
+  readonly attempts: number;
+  readonly lastPlayedAt: number;
+  readonly locked: boolean;
+  readonly lockReason: string | null;
+}
+
+export interface LevelSelectModel {
+  readonly levels: readonly LevelCard[];
+  readonly selectedIndex: number;
+  readonly version: string;
+}
+
+export interface LevelSelectActions {
+  readonly onSelect: (levelId: string) => void;
+  readonly onBack: () => void;
+}
+
+/**
+ * Экран выбора уровня. Уровни приходят из реестра, прогресс — из SaveManager,
+ * поэтому добавление уровня не требует правок этого контроллера.
+ */
+export class LevelSelectController {
+  private index = 0;
+
+  constructor(
+    private readonly ui: UiCanvas,
+    private readonly actions: LevelSelectActions,
+  ) {}
+
+  /** Индекс выделенной карточки; клавиатурная навигация меняет его. */
+  get selectedIndex(): number {
+    return this.index;
+  }
+
+  /** id выделенного уровня по модели; null, если уровней нет. */
+  selectedLevelId(model: LevelSelectModel): string | null {
+    const level = model.levels[model.selectedIndex];
+    return level && !level.locked ? level.id : null;
+  }
+
+  select(index: number, levelCount: number): void {
+    if (levelCount === 0) {
+      this.index = 0;
+      return;
+    }
+    this.index = Math.min(Math.max(index, 0), levelCount - 1);
+  }
+
+  move(delta: number, levelCount: number): void {
+    if (levelCount === 0) return;
+    this.index = (this.index + delta + levelCount) % levelCount;
+  }
+
+  handleClick(id: string): boolean {
+    if (id === 'levels_back') {
+      this.actions.onBack();
+      return true;
+    }
+    if (id.startsWith('level_card:')) {
+      const levelId = id.slice('level_card:'.length);
+      this.actions.onSelect(levelId);
+      return true;
+    }
+    return false;
+  }
+
+  draw(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    model: LevelSelectModel,
+  ): void {
+    this.ui.begin();
+
+    ctx.save();
+    drawMenuBackdrop(ctx, width, height);
+    ctx.textBaseline = 'middle';
+
+    const centerX = width / 2;
+    ctx.font = '700 30px "IBM Plex Mono", monospace';
+    ctx.fillStyle = Palette.orange;
+    ctx.fillText('ВЫБОР ОБЪЕКТА', centerX - ctx.measureText('ВЫБОР ОБЪЕКТА').width / 2, 62);
+
+    ctx.font = '11px "IBM Plex Mono", monospace';
+    ctx.fillStyle = Palette.textMuted;
+    const hint = '↑ ↓ — выбор   Enter — начать   Esc — назад';
+    ctx.fillText(hint, centerX - ctx.measureText(hint).width / 2, 90);
+    ctx.restore();
+
+    if (model.levels.length === 0) {
+      ctx.save();
+      ctx.fillStyle = Palette.red;
+      ctx.font = '700 14px "IBM Plex Mono", monospace';
+      ctx.textBaseline = 'middle';
+      const empty = 'Нет зарегистрированных уровней';
+      ctx.fillText(empty, centerX - ctx.measureText(empty).width / 2, height / 2);
+      ctx.restore();
+      this.ui.button('levels_back', this.backButtonRect(width, height), 'НАЗАД  [Esc]', {
+        accent: Palette.textSecondary,
+      });
+      this.ui.render(ctx);
+      return;
+    }
+
+    const cardW = Math.min(520, width - 80);
+    const cardH = 96;
+    const gap = 16;
+    const totalH = model.levels.length * cardH + (model.levels.length - 1) * gap;
+    const startY = Math.max(120, (height - totalH) / 2);
+    const x = (width - cardW) / 2;
+
+    model.levels.forEach((level, i) => {
+      const y = startY + i * (cardH + gap);
+      const focused = i === model.selectedIndex;
+      this.drawCard(ctx, x, y, cardW, cardH, level, focused);
+      this.ui.button(
+        `level_card:${level.id}`,
+        { x, y, width: cardW, height: cardH },
+        level.locked ? (level.lockReason ?? 'ЗАКРЫТО') : level.title,
+        {
+          accent: focused ? Palette.orange : Palette.textSecondary,
+          disabled: level.locked,
+          hint: level.id,
+        },
+      );
+    });
+
+    this.ui.button('levels_back', this.backButtonRect(width, height), 'НАЗАД  [Esc]', {
+      accent: Palette.textSecondary,
+    });
+    this.ui.render(ctx);
+  }
+
+  private backButtonRect(
+    width: number,
+    height: number,
+  ): {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } {
+    const buttonW = 200;
+    return { x: (width - buttonW) / 2, y: height - 78, width: buttonW, height: 38 };
+  }
+
+  private drawCard(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    level: LevelCard,
+    focused: boolean,
+  ): void {
+    ctx.save();
+    ctx.fillStyle = withAlpha(
+      focused ? Palette.graphiteLight : Palette.graphite,
+      focused ? 0.95 : 0.9,
+    );
+    roundRect(ctx, x, y, w, h, 6);
+    ctx.fill();
+    ctx.strokeStyle = focused ? Palette.orange : BORDER;
+    ctx.lineWidth = focused ? 2 : 1;
+    ctx.stroke();
+
+    // Полоса статуса слева: зелёная — пройден, оранжевая — доступен, серая — закрыт.
+    ctx.fillStyle = level.locked
+      ? Palette.textMuted
+      : level.completed
+        ? Palette.green
+        : Palette.orange;
+    ctx.fillRect(x, y + 6, 4, h - 12);
+
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 10px "IBM Plex Mono", monospace';
+    ctx.fillStyle = Palette.textMuted;
+    ctx.fillText(`УРОВЕНЬ ${level.index}`, x + 18, y + 20);
+
+    ctx.font = '700 17px "IBM Plex Mono", monospace';
+    ctx.fillStyle = level.locked ? Palette.textMuted : Palette.textPrimary;
+    ctx.fillText(level.locked ? (level.lockReason ?? 'ЗАКРЫТО') : level.title, x + 18, y + 42);
+
+    ctx.font = '11px "IBM Plex Mono", monospace';
+    ctx.fillStyle = Palette.textSecondary;
+    const status = level.locked
+      ? (level.lockReason ?? 'Закрыто')
+      : level.completed
+        ? `Пройден · рекорд ${level.bestScore} · ${level.bestRank}`
+        : 'Не пройден';
+    ctx.fillText(status, x + 18, y + 66);
+
+    ctx.textAlign = 'right';
+    ctx.font = '11px "IBM Plex Mono", monospace';
+    ctx.fillStyle = Palette.textMuted;
+    ctx.fillText(`Выстрелов: ${level.maxShots}`, x + w - 18, y + 20);
+    ctx.fillStyle = level.minimumShots === null ? Palette.textMuted : Palette.green;
+    ctx.fillText(
+      level.minimumShots === null ? 'Мин. выстрелов: —' : `Мин. выстрелов: ${level.minimumShots}`,
+      x + w - 18,
+      y + 42,
+    );
+    ctx.fillStyle = Palette.textSecondary;
+    ctx.fillText(`Попыток: ${level.attempts}`, x + w - 18, y + 66);
+    ctx.textAlign = 'left';
+
+    ctx.restore();
+  }
+}
+
+/** Общий фон экранов меню: вертикальный градиент и техническая сетка. */
+function drawMenuBackdrop(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, Palette.graphiteDark);
+  gradient.addColorStop(1, Palette.graphite);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = withAlpha(Palette.steel, 0.06);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = 0; x <= width; x += 44) {
+    ctx.moveTo(x + 0.5, 0);
+    ctx.lineTo(x + 0.5, height);
+  }
+  for (let y = 0; y <= height; y += 44) {
+    ctx.moveTo(0, y + 0.5);
+    ctx.lineTo(width, y + 0.5);
+  }
+  ctx.stroke();
 }
 
 export interface SettingsModel {
@@ -886,6 +1126,10 @@ export class SettingsController {
   handleClick(id: string): boolean {
     if (id === 'settings_back') {
       this.actions.onBack();
+      return true;
+    }
+    if (id === 'settings_reset') {
+      this.actions.onResetProgress();
       return true;
     }
     if (id.startsWith('settings_quality_')) {

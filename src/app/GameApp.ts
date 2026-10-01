@@ -2,7 +2,7 @@ import { AudioManager } from '../audio/AudioManager';
 import { EventBus } from '../core/EventBus';
 import type { GameEvents } from '../core/GameEvents';
 import { GameState, GameStateManager } from '../core/GameStateManager';
-import { InputController } from '../core/InputController';
+import { InputController, type InputAction } from '../core/InputController';
 import {
   SaveManager,
   createDefaultStorage,
@@ -11,7 +11,7 @@ import {
 } from '../core/SaveManager';
 import { validateLevel, type LevelDefinition } from '../data/LevelData';
 import { GameSession, type SessionResult } from '../gameplay/GameSession';
-import type { ScoringSystem } from '../gameplay/ScoringSystem';
+import { asRank } from '../gameplay/ScoringSystem';
 import { LevelManager } from '../levels/LevelManager';
 import { CameraController } from '../render/CameraController';
 import { DebugOverlay } from '../render/DebugOverlay';
@@ -21,13 +21,35 @@ import { TrajectoryRenderer } from '../render/TrajectoryRenderer';
 import { UiCanvas } from '../ui/UiCanvas';
 import {
   HudController,
+  LevelSelectController,
   MainMenuController,
   PauseController,
   ResultController,
   SettingsController,
+  type LevelCard,
 } from '../ui/Controllers';
 
 export const GAME_VERSION = '0.1.0';
+
+/** Поверхность отрисовки: DOM-canvas в браузере, Offscreen-подобный объект в тестах. */
+export interface GameCanvas {
+  width: number;
+  height: number;
+  style: { width: string; height: string };
+  getContext(type: '2d'): CanvasRenderingContext2D | null;
+  getBoundingClientRect(): { left: number; top: number; width: number; height: number };
+  addEventListener(type: string, handler: (event: never) => void, options?: unknown): void;
+  removeEventListener(type: string, handler: (event: never) => void, options?: unknown): void;
+}
+
+/**
+ * Приводит DOM-canvas к минимальной поверхности.
+ * HTMLCanvasElement уже содержит всё нужное, но его перегруженные сигнатуры
+ * событий не совпадают с GameCanvas структурно.
+ */
+export function asGameCanvas(canvas: HTMLCanvasElement): GameCanvas {
+  return canvas as unknown as GameCanvas;
+}
 
 const CONTROLS_HINT = [
   'ЛКМ — прицел и запуск',
@@ -68,7 +90,9 @@ export class GameApp {
   private pause: PauseController | null = null;
   private result: ResultController | null = null;
   private menu: MainMenuController | null = null;
+  private levelSelect: LevelSelectController | null = null;
   private settingsScreen: SettingsController | null = null;
+  private lastPlayedLevelId: string | null = null;
 
   private slowMotionTimer = 0;
   private lastFrameTime = 0;
@@ -78,7 +102,7 @@ export class GameApp {
   private trajectoryVisible = true;
   private notice: { text: string; severity: string; until: number } | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
-  private canvas: HTMLCanvasElement | null = null;
+  private canvas: GameCanvas | null = null;
   private detachInput: (() => void) | null = null;
   private sessionCleanup: Array<() => void> = [];
 
@@ -122,9 +146,15 @@ export class GameApp {
     });
 
     this.menu = new MainMenuController(ui, {
-      onStart: () => void this.startLevel(),
+      onStart: () => void this.startLevel(this.resumeLevelId()),
+      onLevels: () => this.openLevelSelect(),
       onSettings: () => this.states.transitionTo(GameState.Settings),
       onExit: () => this.exitApp(),
+    });
+
+    this.levelSelect = new LevelSelectController(ui, {
+      onSelect: (levelId) => void this.startLevel(levelId),
+      onBack: () => this.states.transitionTo(GameState.MainMenu),
     });
 
     this.settingsScreen = new SettingsController(ui, {
@@ -155,8 +185,12 @@ export class GameApp {
     });
   }
 
-  /** Привязка к canvas и DOM-событиям. */
-  attach(canvas: HTMLCanvasElement): () => void {
+  /**
+   * Минимальная поверхность, которой нужен {@link GameApp}. HTMLCanvasElement
+   * подходит структурно, а тесты подставляют объект из @napi-rs/canvas,
+   * поэтому меню и переходы проверяются без браузера.
+   */
+  attach(canvas: GameCanvas): () => void {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     if (!this.ctx) throw new Error('Не удалось получить 2D-контекст canvas');
@@ -188,9 +222,12 @@ export class GameApp {
     canvas.addEventListener('mouseup', onUp);
     canvas.addEventListener('mouseleave', onLeave);
     canvas.addEventListener('wheel', onWheel, { passive: false });
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('resize', onResize);
+
+    // Клавиатура и размер окна живут на window; в headless их нет.
+    const host = typeof window === 'undefined' ? null : window;
+    host?.addEventListener('keydown', onKeyDown);
+    host?.addEventListener('keyup', onKeyUp);
+    host?.addEventListener('resize', onResize);
 
     this.detachInput?.();
     this.detachInput = () => {
@@ -199,9 +236,9 @@ export class GameApp {
       canvas.removeEventListener('mouseup', onUp);
       canvas.removeEventListener('mouseleave', onLeave);
       canvas.removeEventListener('wheel', onWheel);
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('resize', onResize);
+      host?.removeEventListener('keydown', onKeyDown);
+      host?.removeEventListener('keyup', onKeyUp);
+      host?.removeEventListener('resize', onResize);
       this.input.reset();
     };
 
@@ -229,15 +266,21 @@ export class GameApp {
 
   private resize(): void {
     if (!this.canvas) return;
-    const width = Math.min(1600, Math.max(960, window.innerWidth));
-    const height = Math.min(900, Math.max(540, window.innerHeight));
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    // Вне браузера (headless-проверки) размеры берём из уже установленных.
+    const viewport = typeof window === 'undefined' ? null : window;
+    const width = viewport ? Math.min(1600, Math.max(960, viewport.innerWidth)) : this.canvas.width;
+    const height = viewport
+      ? Math.min(900, Math.max(540, viewport.innerHeight))
+      : this.canvas.height;
+    const dpr = viewport ? Math.min(2, viewport.devicePixelRatio || 1) : 1;
+    const wasVisible = this.debug.isVisible;
     this.canvas.width = Math.floor(width * dpr);
     this.canvas.height = Math.floor(height * dpr);
     this.canvas.style.width = `${width}px`;
     this.canvas.style.height = `${height}px`;
     this.camera?.setViewport({ width: this.canvas.width, height: this.canvas.height });
     this.debug = new DebugOverlay(this.canvas.width);
+    this.debug.setVisible(wasVisible);
   }
 
   // ───────────────────────────── жизненный цикл ─────────────────────────────
@@ -251,11 +294,60 @@ export class GameApp {
     if (levelId) await this.startLevel(levelId);
   }
 
+  /**
+   * Уровень для «Продолжить»: последний сыгранный в этой сессии, иначе уровень
+   * с самой свежей записью в сохранении. Без второго шага кнопка обещала бы
+   * продолжение, но после перезагрузки страницы всегда открывала бы первый уровень.
+   */
+  private resumeLevelId(): string {
+    if (this.lastPlayedLevelId && this.levelManager.has(this.lastPlayedLevelId)) {
+      return this.lastPlayedLevelId;
+    }
+    const cards = this.levelCards();
+    const played = cards.filter((c) => c.attempts > 0);
+    if (played.length === 0) return this.levelManager.defaultLevelId;
+    const latest = played.reduce((a, b) => (b.lastPlayedAt > a.lastPlayedAt ? b : a));
+    return latest.id;
+  }
+
+  private openLevelSelect(): void {
+    const select = this.levelSelect;
+    if (select) select.select(select.selectedIndex, this.levelCards().length);
+    this.states.transitionTo(GameState.LevelSelect);
+  }
+
+  /** Открывает экран выбора уровня. Публичный: используется headless-проверками. */
+  openLevelSelectForTest(): void {
+    this.openLevelSelect();
+  }
+
+  /** Карточки уровней: реестр + прогресс из сохранения. */
+  levelCards(): LevelCard[] {
+    return this.levelManager.availableLevels.map((entry, i) => {
+      const record = this.save.getLevelRecord(entry.id);
+      return {
+        id: entry.id,
+        title: entry.title,
+        index: i + 1,
+        maxShots: entry.maxShots,
+        completed: record?.completed ?? false,
+        bestScore: record?.bestScore ?? 0,
+        bestRank: asRank(record?.bestRank),
+        minimumShots: record?.minimumShots ?? null,
+        attempts: record?.attempts ?? 0,
+        lastPlayedAt: record?.lastPlayedAt ?? 0,
+        locked: false,
+        lockReason: null,
+      };
+    });
+  }
+
   async startLevel(levelId?: string): Promise<void> {
     const id = levelId ?? this.levelManager.defaultLevelId;
     const level = await this.levelManager.load(id);
     validateLevel(level);
     this.createSession(level);
+    this.lastPlayedLevelId = id;
     this.states.transitionTo(GameState.Playing);
     this.events.emit('level:loaded', { levelId: id });
   }
@@ -343,7 +435,9 @@ export class GameApp {
 
   exitApp(): void {
     this.running = false;
-    if (this.rafHandle !== null) cancelAnimationFrame(this.rafHandle);
+    if (this.rafHandle !== null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(this.rafHandle);
+    }
     this.audio.stopMusic();
     this.save.save();
   }
@@ -409,7 +503,12 @@ export class GameApp {
     }
 
     if (state === GameState.MainMenu) {
-      if (actions.includes('confirm')) void this.startLevel();
+      if (actions.includes('confirm')) void this.startLevel(this.resumeLevelId());
+      return;
+    }
+
+    if (state === GameState.LevelSelect) {
+      this.handleLevelSelectActions(actions);
       return;
     }
 
@@ -424,6 +523,43 @@ export class GameApp {
       this.save.updateSettings({ debugMode: visible });
       this.events.emit('debug:toggle', { overlay: visible });
     }
+  }
+
+  private handleLevelSelectActions(actions: readonly InputAction[]): void {
+    const select = this.levelSelect;
+    if (!select) return;
+    const count = this.levelCards().length;
+
+    if (actions.includes('navigateUp')) select.move(-1, count);
+    if (actions.includes('navigateDown')) select.move(1, count);
+    if (actions.includes('pause') || actions.includes('escape')) {
+      this.audio.play('ui_click');
+      this.states.transitionTo(GameState.MainMenu);
+      return;
+    }
+    if (actions.includes('confirm')) {
+      const levelId = select.selectedLevelId(this.levelSelectModel());
+      if (!levelId) {
+        this.notice = {
+          text: 'Нет доступных уровней',
+          severity: 'warning',
+          until: performance.now() + 2000,
+        };
+        return;
+      }
+      this.audio.play('ui_click');
+      void this.startLevel(levelId);
+    }
+  }
+
+  private levelSelectModel(): Parameters<LevelSelectController['draw']>[3] {
+    const cards = this.levelCards();
+    const select = this.levelSelect;
+    return {
+      levels: cards,
+      selectedIndex: select ? Math.min(select.selectedIndex, Math.max(0, cards.length - 1)) : 0,
+      version: GAME_VERSION,
+    };
   }
 
   private resumeOrLeave(): void {
@@ -450,33 +586,39 @@ export class GameApp {
       this.session.aimAtScreenPoint(x, y);
     }
 
-    if (this.states.is(GameState.Settings)) {
-      const ui = this.ui;
-      const settings = this.save.currentSettings;
-      if (!ui) return;
+    if (this.states.is(GameState.Settings)) this.applySettingsFromUi();
+  }
 
-      const sfx = ui.getValue('settings_sfx');
-      const music = ui.getValue('settings_music');
-      if (sfx !== undefined || music !== undefined) {
-        this.save.updateSettings({
-          ...(sfx !== undefined ? { sfxVolume: sfx } : {}),
-          ...(music !== undefined ? { musicVolume: music } : {}),
-        });
-        this.audio.setVolumes(
-          this.save.currentSettings.sfxVolume,
-          this.save.currentSettings.musicVolume,
-        );
-      }
+  /**
+   * Сверяет контролы экрана настроек с сохранением. Вызывается и при перетаскивании
+   * ползунков, и после клика по чекбоксу: значения живут в контролах до конца кадра.
+   */
+  private applySettingsFromUi(): void {
+    const ui = this.ui;
+    if (!ui || !this.states.is(GameState.Settings)) return;
+    const settings = this.save.currentSettings;
 
-      if (ui.isChecked('settings_debug') !== settings.debugMode) {
-        this.applySettings({ debugMode: ui.isChecked('settings_debug') });
-      }
-      if (ui.isChecked('settings_trajectory') !== this.trajectoryVisible) {
-        this.applySettings({ showTrajectory: ui.isChecked('settings_trajectory') });
-      }
-      if (ui.isChecked('settings_fullscreen') !== settings.fullscreen) {
-        this.applySettings({ fullscreen: ui.isChecked('settings_fullscreen') });
-      }
+    const sfx = ui.getValue('settings_sfx');
+    const music = ui.getValue('settings_music');
+    if (sfx !== undefined || music !== undefined) {
+      this.save.updateSettings({
+        ...(sfx !== undefined ? { sfxVolume: sfx } : {}),
+        ...(music !== undefined ? { musicVolume: music } : {}),
+      });
+      this.audio.setVolumes(
+        this.save.currentSettings.sfxVolume,
+        this.save.currentSettings.musicVolume,
+      );
+    }
+
+    if (ui.isChecked('settings_debug') !== settings.debugMode) {
+      this.applySettings({ debugMode: ui.isChecked('settings_debug') });
+    }
+    if (ui.isChecked('settings_trajectory') !== this.trajectoryVisible) {
+      this.applySettings({ showTrajectory: ui.isChecked('settings_trajectory') });
+    }
+    if (ui.isChecked('settings_fullscreen') !== settings.fullscreen) {
+      this.applySettings({ fullscreen: ui.isChecked('settings_fullscreen') });
     }
   }
 
@@ -485,6 +627,7 @@ export class GameApp {
     if (id) {
       this.audio.play('ui_click');
       this.dispatchUiClick(id);
+      if (this.states.is(GameState.Settings)) this.applySettingsFromUi();
       return;
     }
 
@@ -501,6 +644,7 @@ export class GameApp {
     this.pause?.handleClick(id);
     this.result?.handleClick(id);
     this.menu?.handleClick(id);
+    this.levelSelect?.handleClick(id);
     this.settingsScreen?.handleClick(id);
   }
 
@@ -508,8 +652,19 @@ export class GameApp {
 
   private loop = (timestamp: number): void => {
     if (!this.running) return;
-    this.rafHandle = requestAnimationFrame(this.loop);
+    if (typeof requestAnimationFrame === 'function') {
+      this.rafHandle = requestAnimationFrame(this.loop);
+    } else {
+      this.rafHandle = null;
+    }
+    this.frame(timestamp);
+  };
 
+  /**
+   * Один кадр целиком: ввод → логика → отрисовка → сброс кадровых состояний ввода.
+   * Публичный метод: headless-проверки двигают приложение вручную, без rAF.
+   */
+  frame(timestamp = 0): void {
     const now = timestamp || performance.now();
     if (this.lastFrameTime === 0) this.lastFrameTime = now;
     const frameMs = performance.now();
@@ -523,7 +678,18 @@ export class GameApp {
     this.debug.update(dt, performance.now() - frameMs);
     this.draw();
     this.input.endFrame();
-  };
+  }
+
+  /**
+   * Продвигает приложение на фиксированное число кадров без requestAnimationFrame.
+   * Метки времени задаются вручную, поэтому шаг одинаков и не зависит от нагрузки.
+   */
+  advance(frames: number, dt = 1 / 60): void {
+    this.lastFrameTime = 0;
+    for (let i = 0; i < frames; i += 1) {
+      this.frame((i + 1) * dt * 1000);
+    }
+  }
 
   /** Один тик логики. Публичный метод — используется headless-проверками. */
   tick(dt: number): void {
@@ -602,6 +768,11 @@ export class GameApp {
     switch (state) {
       case GameState.MainMenu:
         this.menu?.draw(ctx, width, height, this.menuModel());
+        this.drawNotice(ctx, width, height);
+        break;
+      case GameState.LevelSelect:
+        this.levelSelect?.draw(ctx, width, height, this.levelSelectModel());
+        this.drawNotice(ctx, width, height);
         break;
       case GameState.Settings:
         this.settingsScreen?.draw(ctx, width, height, {
@@ -709,7 +880,7 @@ export class GameApp {
       );
     }
 
-    this.hud?.draw(ctx, width, height, this.hudModel());
+    this.hud?.draw(ctx, width, height, this.hudModel(session));
 
     this.drawNotice(ctx, width, height);
     this.debug.draw(
@@ -821,20 +992,26 @@ export class GameApp {
     });
   }
 
-  private menuModel(): ReturnType<() => Parameters<MainMenuController['draw']>[3]> {
-    const levelId = this.levelManager.defaultLevelId;
-    const record = this.save.getLevelRecord(levelId);
+  /** Модель главного меню. Публичный getter — используется headless-проверками. */
+  menuModel(): Parameters<MainMenuController['draw']>[3] {
+    const cards = this.levelCards();
+    const resumeId = this.resumeLevelId();
+    const record = this.save.getLevelRecord(resumeId);
+    const completedCount = cards.filter((c) => c.completed).length;
+    const rank = record ? asRank(record.bestRank) : 'Нет результата';
     return {
       version: GAME_VERSION,
       bestScore: record?.bestScore ?? 0,
-      bestRank: (record?.bestRank as ReturnType<typeof ScoringSystem.rankFor>) ?? 'Нет результата',
-      levelCompleted: this.save.hasCompleted(levelId),
+      bestRank: rank,
+      levelCompleted: record?.completed ?? false,
+      levelCount: cards.length,
+      completedLevelCount: completedCount,
+      canResume: completedCount > 0,
       controlsHint: CONTROLS_HINT,
     };
   }
 
-  private hudModel(): Parameters<HudController['draw']>[3] {
-    const session = this.session as GameSession;
+  private hudModel(session: GameSession): Parameters<HudController['draw']>[3] {
     const generator = session.generatorElement;
     const redZone = session.zones.redZones[0];
     const greenZone = session.zones.greenZones[0];

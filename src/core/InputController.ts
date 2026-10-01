@@ -6,7 +6,9 @@ export type InputAction =
   | 'toggleAnalysis'
   | 'debugOverlay'
   | 'confirm'
-  | 'escape';
+  | 'escape'
+  | 'navigateUp'
+  | 'navigateDown';
 
 export interface PointerState {
   readonly x: number;
@@ -144,6 +146,15 @@ export class InputController {
     return this.held.has('slowMotion');
   }
 
+  /**
+   * Имитация действия без клавиатуры. Нужна headless-проверкам меню и паузе:
+   * привязать реальные события окна вне браузера нельзя.
+   */
+  press(action: InputAction): void {
+    this.held.add(action);
+    this.frameActions.add(action);
+  }
+
   /** Действия, сработавшие в этом кадре. */
   consumeActions(): InputAction[] {
     const out = [...this.frameActions];
@@ -191,6 +202,10 @@ export const KEY_MAP: Readonly<Record<string, InputAction>> = {
   KeyV: 'toggleAnalysis',
   F1: 'debugOverlay',
   Enter: 'confirm',
+  ArrowUp: 'navigateUp',
+  KeyW: 'navigateUp',
+  ArrowDown: 'navigateDown',
+  KeyS: 'navigateDown',
 };
 
 /** Действия, требующие удержания клавиши (медленное время). */

@@ -3,6 +3,7 @@
 export const GameState = {
   Boot: 'boot',
   MainMenu: 'main_menu',
+  LevelSelect: 'level_select',
   Settings: 'settings',
   Playing: 'playing',
   Paused: 'paused',
@@ -14,10 +15,21 @@ export type GameStateName = (typeof GameState)[keyof typeof GameState];
 /** Разрешённые переходы. Любой другой переход игнорируется с предупреждением. */
 const TRANSITIONS: Record<GameStateName, readonly GameStateName[]> = {
   [GameState.Boot]: [GameState.MainMenu],
-  [GameState.MainMenu]: [GameState.Settings, GameState.Playing, GameState.Boot],
-  [GameState.Settings]: [GameState.MainMenu, GameState.Boot],
+  [GameState.MainMenu]: [
+    GameState.LevelSelect,
+    GameState.Settings,
+    GameState.Playing,
+    GameState.Boot,
+  ],
+  [GameState.LevelSelect]: [
+    GameState.Playing,
+    GameState.MainMenu,
+    GameState.Settings,
+    GameState.Boot,
+  ],
+  [GameState.Settings]: [GameState.MainMenu, GameState.LevelSelect, GameState.Boot],
   [GameState.Playing]: [GameState.Paused, GameState.Result, GameState.MainMenu, GameState.Settings],
-  [GameState.Paused]: [GameState.Playing, GameState.MainMenu, GameState.Result],
+  [GameState.Paused]: [GameState.Playing, GameState.MainMenu, GameState.Result, GameState.Settings],
   [GameState.Result]: [GameState.Playing, GameState.MainMenu, GameState.Settings],
 };
 

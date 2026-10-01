@@ -54,6 +54,13 @@ export const RANK_THRESHOLDS: readonly { readonly rank: Rank; readonly score: nu
   { rank: 'Bronze', score: 700 },
 ];
 
+const RANK_NAMES: readonly string[] = ['Нет результата', ...RANK_THRESHOLDS.map((t) => t.rank)];
+
+/** Ранг приходит из сохранения строкой, поэтому нужна проверка на известное значение. */
+export function asRank(value: string | null | undefined): Rank {
+  return value && RANK_NAMES.includes(value) ? (value as Rank) : 'Нет результата';
+}
+
 /**
  * Подсчёт очков. Формула:
  * score = base + objective + generator + safeDebris + accuracy - shot - redZone - damage

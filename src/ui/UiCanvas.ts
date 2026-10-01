@@ -170,7 +170,9 @@ export class UiCanvas {
     if (!active) return null;
     const control = this.controls.find((c) => c.id === active);
     if (!control || control.disabled) return null;
-    return pointInRect(x, y, control.rect) ? active : null;
+    if (!pointInRect(x, y, control.rect)) return null;
+    if (control.type === 'toggle') control.checked = !control.checked;
+    return active;
   }
 
   handleDrag(x: number): string | null {
