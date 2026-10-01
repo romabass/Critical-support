@@ -1,0 +1,45 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #14171c;
+}
+
+#app {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+#game-canvas {
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+  image-rendering: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+noscript {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  color: #d8dde3;
+  font-family: system-ui, sans-serif;
+  text-align: center;
+}

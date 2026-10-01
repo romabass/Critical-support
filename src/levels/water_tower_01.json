@@ -1,0 +1,681 @@
+{
+  "id": "water_tower_01",
+  "title": "Старая водонапорная башня",
+  "description": "Верхняя часть промышленной башни должна быть демонтирована в сторону безопасной зоны. Генератор резервного питания стоит рядом с башней и должен остаться работоспособным.",
+  "briefing": [
+    "Обрушить не менее 80% группы upper_tower.",
+    "Повреждение генератора не должно превысить 25%.",
+    "Масса крупных обломков в красной зоне — не более 320 кг.",
+    "Доступно 3 запуска. Экономьте боезапас."
+  ],
+  "maxShots": 3,
+  "projectileId": "concrete_impact_ball",
+  "launcher": {
+    "x": -0.6,
+    "y": 2.4,
+    "minAngleDeg": -12,
+    "maxAngleDeg": 82,
+    "defaultAngleDeg": 41,
+    "minPower": 0.15,
+    "maxPower": 1
+  },
+  "environment": {
+    "groundY": 0,
+    "leftBound": -12,
+    "rightBound": 44,
+    "ceilingY": 26,
+    "killY": -12,
+    "gravity": 18
+  },
+  "camera": {
+    "centerX": 14,
+    "centerY": 8,
+    "zoom": 1
+  },
+  "parShots": 2,
+  "largeDebrisMass": 40,
+  "criticalObjects": ["generator_01"],
+  "elements": [
+    {
+      "id": "ground_bed",
+      "material": "ground",
+      "shape": "box",
+      "x": 16,
+      "y": -1.5,
+      "width": 62,
+      "height": 3,
+      "role": "ground",
+      "anchored": true,
+      "label": "Основание площадки"
+    },
+    {
+      "id": "generator_pad",
+      "material": "concrete",
+      "shape": "box",
+      "x": 6.4,
+      "y": 0.5,
+      "width": 4.2,
+      "height": 1,
+      "group": "foundation",
+      "role": "foundation",
+      "anchored": true,
+      "loadBearing": true,
+      "label": "Плита под генератор"
+    },
+    {
+      "id": "generator_01",
+      "material": "generator",
+      "shape": "box",
+      "x": 6.4,
+      "y": 1.85,
+      "width": 3.2,
+      "height": 1.7,
+      "group": "core",
+      "role": "machine",
+      "loadBearing": true,
+      "protectable": true,
+      "health": 420,
+      "label": "Генератор резервного питания"
+    },
+    {
+      "id": "foundation_left",
+      "material": "concrete",
+      "shape": "box",
+      "x": 11.5,
+      "y": 1.2,
+      "width": 1.8,
+      "height": 2.4,
+      "group": "foundation",
+      "role": "foundation",
+      "anchored": true,
+      "loadBearing": true
+    },
+    {
+      "id": "foundation_right",
+      "material": "concrete",
+      "shape": "box",
+      "x": 19.5,
+      "y": 1.2,
+      "width": 1.8,
+      "height": 2.4,
+      "group": "foundation",
+      "role": "foundation",
+      "anchored": true,
+      "loadBearing": true
+    },
+    {
+      "id": "footing_left",
+      "material": "concrete",
+      "shape": "box",
+      "x": 11.5,
+      "y": 2.9,
+      "width": 3.2,
+      "height": 1,
+      "group": "foundation",
+      "role": "foundation",
+      "anchored": true,
+      "loadBearing": true
+    },
+    {
+      "id": "footing_right",
+      "material": "concrete",
+      "shape": "box",
+      "x": 19.5,
+      "y": 2.9,
+      "width": 3.2,
+      "height": 1,
+      "group": "foundation",
+      "role": "foundation",
+      "anchored": true,
+      "loadBearing": true
+    },
+    {
+      "id": "column_left_a",
+      "material": "concrete",
+      "shape": "box",
+      "x": 12.4,
+      "y": 6.2,
+      "width": 1.1,
+      "height": 5.6,
+      "group": "frame",
+      "role": "support",
+      "loadBearing": true,
+      "critical": true,
+      "label": "Левая колонна, нижняя секция"
+    },
+    {
+      "id": "column_right_a",
+      "material": "concrete",
+      "shape": "box",
+      "x": 18.6,
+      "y": 6.2,
+      "width": 1.1,
+      "height": 5.6,
+      "group": "frame",
+      "role": "support",
+      "loadBearing": true,
+      "critical": true,
+      "label": "Правая колонна, нижняя секция"
+    },
+    {
+      "id": "column_left_b",
+      "material": "concrete",
+      "shape": "box",
+      "x": 12.4,
+      "y": 11.6,
+      "width": 1.1,
+      "height": 5.2,
+      "group": "upper_tower",
+      "role": "support",
+      "loadBearing": true,
+      "critical": true,
+      "health": 120,
+      "label": "Левая колонна, верхняя секция"
+    },
+    {
+      "id": "column_right_b",
+      "material": "concrete",
+      "shape": "box",
+      "x": 18.6,
+      "y": 11.6,
+      "width": 1.1,
+      "height": 5.2,
+      "group": "upper_tower",
+      "role": "support",
+      "loadBearing": true,
+      "critical": true,
+      "health": 120,
+      "label": "Правая колонна, верхняя секция"
+    },
+    {
+      "id": "bracing_beam_left",
+      "material": "steel",
+      "shape": "box",
+      "x": 14.2,
+      "y": 10.0,
+      "width": 3.4,
+      "height": 0.32,
+      "angle": 26,
+      "group": "bracing",
+      "role": "beam",
+      "loadBearing": true,
+      "label": "Раскос, левый"
+    },
+    {
+      "id": "bracing_beam_right",
+      "material": "steel",
+      "shape": "box",
+      "x": 16.8,
+      "y": 10.0,
+      "width": 3.4,
+      "height": 0.32,
+      "angle": -26,
+      "group": "bracing",
+      "role": "beam",
+      "loadBearing": true,
+      "label": "Раскос, правый"
+    },
+    {
+      "id": "wood_prop_left",
+      "material": "wood",
+      "shape": "box",
+      "x": 10.6,
+      "y": 4.6,
+      "width": 0.8,
+      "height": 4.4,
+      "angle": -12,
+      "group": "bracing",
+      "role": "support",
+      "loadBearing": true,
+      "health": 55,
+      "label": "Деревянная распорка, левая"
+    },
+    {
+      "id": "wood_prop_right",
+      "material": "wood",
+      "shape": "box",
+      "x": 20.4,
+      "y": 4.6,
+      "width": 0.8,
+      "height": 4.4,
+      "angle": 12,
+      "group": "bracing",
+      "role": "support",
+      "loadBearing": true,
+      "health": 55,
+      "label": "Деревянная распорка, правая"
+    },
+    {
+      "id": "deck_low",
+      "material": "steel",
+      "shape": "box",
+      "x": 15.5,
+      "y": 9.4,
+      "width": 7.6,
+      "height": 0.42,
+      "group": "upper_tower",
+      "role": "beam",
+      "loadBearing": true,
+      "health": 190,
+      "label": "Стальная площадка, нижняя"
+    },
+    {
+      "id": "glass_panel_left",
+      "material": "glass",
+      "shape": "box",
+      "x": 14.1,
+      "y": 10.0,
+      "width": 3,
+      "height": 0.24,
+      "group": "upper_tower",
+      "role": "panel",
+      "label": "Стеклянная панель, левая"
+    },
+    {
+      "id": "glass_panel_right",
+      "material": "glass",
+      "shape": "box",
+      "x": 16.9,
+      "y": 10.0,
+      "width": 3,
+      "height": 0.24,
+      "group": "upper_tower",
+      "role": "panel",
+      "label": "Стеклянная панель, правая"
+    },
+    {
+      "id": "walkway",
+      "material": "steel",
+      "shape": "box",
+      "x": 20.6,
+      "y": 8.9,
+      "width": 2.6,
+      "height": 0.28,
+      "group": "upper_tower",
+      "role": "beam",
+      "health": 150,
+      "label": "Площадка обслуживания"
+    },
+    {
+      "id": "tank_base",
+      "material": "concrete",
+      "shape": "box",
+      "x": 15.5,
+      "y": 10.6,
+      "width": 6.2,
+      "height": 0.7,
+      "group": "upper_tower",
+      "role": "block",
+      "loadBearing": true,
+      "health": 130,
+      "label": "Дно резервуара"
+    },
+    {
+      "id": "tank_band_left",
+      "material": "steel",
+      "shape": "box",
+      "x": 13.3,
+      "y": 12.5,
+      "width": 0.34,
+      "height": 3.2,
+      "group": "upper_tower",
+      "role": "beam",
+      "loadBearing": true,
+      "health": 170,
+      "label": "Обруч резервуара, левый"
+    },
+    {
+      "id": "tank_band_right",
+      "material": "steel",
+      "shape": "box",
+      "x": 17.7,
+      "y": 12.5,
+      "width": 0.34,
+      "height": 3.2,
+      "group": "upper_tower",
+      "role": "beam",
+      "loadBearing": true,
+      "health": 170,
+      "label": "Обруч резервуара, правый"
+    },
+    {
+      "id": "tank_shell_left",
+      "material": "concrete",
+      "shape": "box",
+      "x": 14.3,
+      "y": 12.5,
+      "width": 2.1,
+      "height": 3.2,
+      "group": "upper_tower",
+      "role": "block",
+      "health": 120,
+      "label": "Стена резервуара, левая"
+    },
+    {
+      "id": "tank_shell_right",
+      "material": "concrete",
+      "shape": "box",
+      "x": 16.7,
+      "y": 12.5,
+      "width": 2.1,
+      "height": 3.2,
+      "group": "upper_tower",
+      "role": "block",
+      "health": 120,
+      "label": "Стена резервуара, правая"
+    },
+    {
+      "id": "tank_core",
+      "material": "glass",
+      "shape": "box",
+      "x": 15.5,
+      "y": 12.5,
+      "width": 2.1,
+      "height": 3.2,
+      "group": "upper_tower",
+      "role": "panel",
+      "label": "Вставка резервуара"
+    },
+    {
+      "id": "tank_crown",
+      "material": "concrete",
+      "shape": "box",
+      "x": 15.5,
+      "y": 14.5,
+      "width": 5.6,
+      "height": 0.6,
+      "group": "upper_tower",
+      "role": "block",
+      "loadBearing": true,
+      "health": 130,
+      "label": "Венец резервуара"
+    },
+    {
+      "id": "cap_vent",
+      "material": "steel",
+      "shape": "box",
+      "x": 15.5,
+      "y": 15.4,
+      "width": 1.1,
+      "height": 1.2,
+      "group": "upper_tower",
+      "role": "beam",
+      "health": 120,
+      "label": "Вентиляционная труба"
+    },
+    {
+      "id": "cap_hatch",
+      "material": "wood",
+      "shape": "box",
+      "x": 15.5,
+      "y": 16.3,
+      "width": 1.8,
+      "height": 0.34,
+      "group": "upper_tower",
+      "role": "block",
+      "label": "Люк"
+    }
+  ],
+  "connections": [
+    {
+      "id": "c_pad_gen",
+      "a": "generator_pad",
+      "b": "generator_01",
+      "kind": "bolt",
+      "strength": 2600
+    },
+    {
+      "id": "c_fnd_l_foot",
+      "a": "foundation_left",
+      "b": "footing_left",
+      "kind": "mortar",
+      "strength": 5200
+    },
+    {
+      "id": "c_fnd_r_foot",
+      "a": "foundation_right",
+      "b": "footing_right",
+      "kind": "mortar",
+      "strength": 5200
+    },
+    {
+      "id": "c_fnd_l_col",
+      "a": "foundation_left",
+      "b": "column_left_a",
+      "kind": "mortar",
+      "strength": 6400,
+      "critical": true
+    },
+    {
+      "id": "c_fnd_r_col",
+      "a": "foundation_right",
+      "b": "column_right_a",
+      "kind": "mortar",
+      "strength": 6400,
+      "critical": true
+    },
+    {
+      "id": "c_col_la_lb",
+      "a": "column_left_a",
+      "b": "column_left_b",
+      "kind": "weld",
+      "strength": 4200,
+      "critical": true
+    },
+    {
+      "id": "c_col_ra_rb",
+      "a": "column_right_a",
+      "b": "column_right_b",
+      "kind": "weld",
+      "strength": 4200,
+      "critical": true
+    },
+    {
+      "id": "c_prop_l_foot",
+      "a": "wood_prop_left",
+      "b": "footing_left",
+      "kind": "bolt",
+      "strength": 700
+    },
+    {
+      "id": "c_prop_r_foot",
+      "a": "wood_prop_right",
+      "b": "footing_right",
+      "kind": "bolt",
+      "strength": 700
+    },
+    { "id": "c_deck_la", "a": "column_left_a", "b": "deck_low", "kind": "bolt", "strength": 2600 },
+    { "id": "c_deck_ra", "a": "column_right_a", "b": "deck_low", "kind": "bolt", "strength": 2600 },
+    {
+      "id": "c_brace_l_deck",
+      "a": "bracing_beam_left",
+      "b": "deck_low",
+      "kind": "weld",
+      "strength": 1800
+    },
+    {
+      "id": "c_brace_r_deck",
+      "a": "bracing_beam_right",
+      "b": "deck_low",
+      "kind": "weld",
+      "strength": 1800
+    },
+    {
+      "id": "c_brace_l_col",
+      "a": "bracing_beam_left",
+      "b": "column_left_a",
+      "kind": "weld",
+      "strength": 1400
+    },
+    {
+      "id": "c_brace_r_col",
+      "a": "bracing_beam_right",
+      "b": "column_right_a",
+      "kind": "weld",
+      "strength": 1400
+    },
+    {
+      "id": "c_glass_l_deck",
+      "a": "glass_panel_left",
+      "b": "deck_low",
+      "kind": "mortar",
+      "strength": 320
+    },
+    {
+      "id": "c_glass_r_deck",
+      "a": "glass_panel_right",
+      "b": "deck_low",
+      "kind": "mortar",
+      "strength": 320
+    },
+    {
+      "id": "c_glass_l_tank",
+      "a": "glass_panel_left",
+      "b": "tank_base",
+      "kind": "mortar",
+      "strength": 320
+    },
+    {
+      "id": "c_glass_r_tank",
+      "a": "glass_panel_right",
+      "b": "tank_base",
+      "kind": "mortar",
+      "strength": 320
+    },
+    { "id": "c_tank_deck", "a": "tank_base", "b": "deck_low", "kind": "weld", "strength": 2400 },
+    {
+      "id": "c_base_band_l",
+      "a": "tank_base",
+      "b": "tank_band_left",
+      "kind": "weld",
+      "strength": 1400
+    },
+    {
+      "id": "c_base_band_r",
+      "a": "tank_base",
+      "b": "tank_band_right",
+      "kind": "weld",
+      "strength": 1400
+    },
+    {
+      "id": "c_band_l_shell_l",
+      "a": "tank_band_left",
+      "b": "tank_shell_left",
+      "kind": "weld",
+      "strength": 1200
+    },
+    {
+      "id": "c_band_r_shell_r",
+      "a": "tank_band_right",
+      "b": "tank_shell_right",
+      "kind": "weld",
+      "strength": 1200
+    },
+    {
+      "id": "c_shell_l_core",
+      "a": "tank_shell_left",
+      "b": "tank_core",
+      "kind": "mortar",
+      "strength": 380
+    },
+    {
+      "id": "c_shell_r_core",
+      "a": "tank_shell_right",
+      "b": "tank_core",
+      "kind": "mortar",
+      "strength": 380
+    },
+    {
+      "id": "c_band_l_core",
+      "a": "tank_band_left",
+      "b": "tank_core",
+      "kind": "bolt",
+      "strength": 500
+    },
+    {
+      "id": "c_band_r_core",
+      "a": "tank_band_right",
+      "b": "tank_core",
+      "kind": "bolt",
+      "strength": 500
+    },
+    { "id": "c_crown_base", "a": "tank_crown", "b": "tank_base", "kind": "weld", "strength": 1600 },
+    {
+      "id": "c_crown_shell_l",
+      "a": "tank_crown",
+      "b": "tank_shell_left",
+      "kind": "weld",
+      "strength": 1300
+    },
+    {
+      "id": "c_crown_shell_r",
+      "a": "tank_crown",
+      "b": "tank_shell_right",
+      "kind": "weld",
+      "strength": 1300
+    },
+    {
+      "id": "c_crown_band_l",
+      "a": "tank_crown",
+      "b": "tank_band_left",
+      "kind": "weld",
+      "strength": 1100
+    },
+    {
+      "id": "c_crown_band_r",
+      "a": "tank_crown",
+      "b": "tank_band_right",
+      "kind": "weld",
+      "strength": 1100
+    },
+    { "id": "c_vent_crown", "a": "cap_vent", "b": "tank_crown", "kind": "weld", "strength": 700 },
+    { "id": "c_hatch_vent", "a": "cap_hatch", "b": "cap_vent", "kind": "bolt", "strength": 420 },
+    { "id": "c_walk_deck", "a": "walkway", "b": "deck_low", "kind": "bolt", "strength": 1500 },
+    { "id": "c_walk_col_r", "a": "walkway", "b": "column_right_b", "kind": "bolt", "strength": 900 }
+  ],
+  "zones": [
+    {
+      "id": "red_zone",
+      "kind": "red",
+      "x": 8.5,
+      "y": 5.5,
+      "width": 15,
+      "height": 11,
+      "label": "Запретная зона",
+      "maximumDebrisMass": 320
+    },
+    {
+      "id": "green_zone",
+      "kind": "green",
+      "x": 24,
+      "y": 0,
+      "width": 13,
+      "height": 8,
+      "label": "Безопасная зона",
+      "targetDebrisMass": 300
+    }
+  ],
+  "objectives": [
+    {
+      "type": "destroy_group",
+      "group": "upper_tower",
+      "minimumPercent": 80,
+      "label": "Обрушить верхнюю часть башни",
+      "weight": 0.5
+    },
+    {
+      "type": "protect_object",
+      "objectId": "generator_01",
+      "maximumDamage": 25,
+      "label": "Сохранить генератор",
+      "weight": 0.3
+    },
+    {
+      "type": "zone_debris_limit",
+      "zoneId": "red_zone",
+      "maximumDebrisMass": 320,
+      "label": "Ограничить массу обломков в красной зоне",
+      "weight": 0.2
+    }
+  ]
+}
